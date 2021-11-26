@@ -2,50 +2,67 @@ import {
   catchError,
   debounceTime,
   distinctUntilChanged,
+  from,
   fromEvent,
   map,
-  of,
   pluck,
   switchMap,
 } from "rxjs";
-import { ajax } from "rxjs/ajax";
-import { API_BASE_URL, API_QUERY, displayResults, getJsLibrary } from "./utils";
+import { displayResults, getJsLibrary } from "./utils";
 
+// Get the html elements
 const searchbar = document.getElementById("searchbar");
 const suggestedResults = document.getElementById("suggested-results");
 
-// Debounce time can be solved with loadash
-// distinctUntilChanged -> store last value in
-// variable and compapre it to the new value
-const onTextChange = (e) => {
+const customDebounceTime = (callback, wait) => {
+  let timeoutId = null;
+  return (...args) => {
+    clearTimeout(timeoutId);
+    timeoutId = setTimeout(() => {
+      callback.apply(null, args);
+    }, wait);
+  };
+};
+
+let previousSearchedValue = "";
+// Handle the logic while the user is typing
+const onTextChange = customDebounceTime((e) => {
   const serachedValue = searchbar.value;
+  // customDistinctUntilChanged() logic
+  if (previousSearchedValue === serachedValue) return;
+  previousSearchedValue = serachedValue;
+
   getJsLibrary(serachedValue)
     .then((response) => {
       const transformedResponse = response.data.results;
-      displayResults(suggestedResults, transformedResponse);
+      // Show only 5 results
+      const limitedResponse = transformedResponse.slice(0, 5);
+      displayResults(suggestedResults, limitedResponse);
     })
     .catch((e) => console.warn("Error ", e));
-};
+}, 1000);
 
+// Trigger event, when user is typing
 searchbar.addEventListener("input", onTextChange);
 
+// Get the html elements
 const searchbarRx = document.getElementById("searchbarRx");
 const suggestedResultsRx = document.getElementById("suggested-results-rx");
 
+// Create observable from event
 const userInputObs = fromEvent(searchbarRx, "input");
 
+// Handle the logic while the user is typing
 userInputObs
   .pipe(
     pluck("target", "value"),
     debounceTime(1000),
     distinctUntilChanged(),
     switchMap((searchedText) => {
-      const url = API_BASE_URL + API_QUERY + searchedText;
-      return ajax(url).pipe(
-        map((res) => res.response.results),
-        catchError((err) => {
-          return of(error);
-        })
+      return from(getJsLibrary(searchedText)).pipe(
+        map((res) => res.data.results),
+        map((res) => res.slice(0, 5)),
+        catchError((e) => console.warn("Error observable", e))
       );
     })
   )
