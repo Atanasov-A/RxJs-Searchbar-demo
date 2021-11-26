@@ -15,10 +15,10 @@ const searchbar = document.getElementById("searchbar");
 const suggestedResults = document.getElementById("suggested-results");
 
 const customDebounceTime = (callback, wait) => {
-  let timeoutId = null;
+  let timerId = null;
   return (...args) => {
-    clearTimeout(timeoutId);
-    timeoutId = setTimeout(() => {
+    clearTimeout(timerId);
+    timerId = setTimeout(() => {
       callback.apply(null, args);
     }, wait);
   };
